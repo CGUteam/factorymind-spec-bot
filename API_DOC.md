@@ -7,20 +7,41 @@
 
 ## 系統架構
 
+**輸入方式 A：LINE Bot**
 ```
-LINE 語音
+LINE 語音訊息
   ↓
-POST /line/webhook（自動觸發）
+POST /line/webhook
   ↓
 Whisper ASR → 文字
   ↓
 Qwen2.5:7b Agent → 結構化任務 JSON
   ↓
+LINE 回覆結果
+```
+
+**輸入方式 B：ESP32 智慧音箱**
+```
+ESP32 麥克風錄音（WAV）
+  ↓
+POST /process
+  ↓
+Whisper ASR → 文字
+  ↓
+Qwen2.5:7b Agent → 結構化任務 JSON
+  ↓
+LINE Push Message 通知使用者
+```
+
+**兩者共同的後續串接（待完成）：**
+```
+結構化任務 JSON
+  ↓
 [待串接] RAG Spec 查詢
   ↓
 [待串接] Robot 執行
   ↓
-LINE 回覆結果
+LINE 回報最終結果
 ```
 
 ---
@@ -40,7 +61,7 @@ LINE 回覆結果
 
 ### `POST /process`
 
-**ESP32 智慧音箱專用端點。** 一次完成 ASR + Agent 解析，回傳結構化任務 JSON。
+**ESP32 智慧音箱專用端點。** 一次完成 ASR + Agent 解析，回傳結構化任務 JSON，並自動推 LINE 通知使用者。
 
 **Content-Type：** `multipart/form-data`
 
@@ -62,6 +83,17 @@ LINE 回覆結果
     "result": "pending"
   }
 }
+```
+
+**處理完成後自動推送 LINE 訊息格式：**
+```
+📡 ESP32 語音指令
+🎤 辨識：幫我檢查 A 產品的外觀缺陷
+
+📋 檢查任務：
+產品：A產品
+項目：外觀缺陷
+狀態：pending
 ```
 
 **ESP32 呼叫範例（Arduino / C++）**
