@@ -58,6 +58,7 @@ LINE Push Message 品管報告
 檢查明細：
   ✅ 外觀缺陷：0.91（門檻 0.85）
 ```
+<img width="1084" height="1511" alt="S__34529284" src="https://github.com/user-attachments/assets/5c4ab7f3-7bbf-4044-ad8d-89cec4e6c093" />
 
 **輸入方式 A：LINE Bot**
 ```
