@@ -1,4 +1,5 @@
 import json
+import os
 import httpx
 
 OLLAMA_URL = "http://localhost:11434/v1/chat/completions"
@@ -18,12 +19,16 @@ SYSTEM_PROMPT = """你是工廠品管助理（OpenClaw Agent）。
       "method": "vision_detection 或 manual"
     }
   ],
+  "placement": {
+    "pass": "正常區",
+    "fail": "缺陷區"
+  },
   "result": "pending"
 }
 
-method 規則：
-- 外觀、缺陷、尺寸、顏色 → vision_detection
-- 其他 → manual
+規則：
+- method：外觀、缺陷、尺寸、顏色 → vision_detection；其他 → manual
+- placement：從語音中判斷合格放哪區、不合格放哪區；若未提及則預設 pass→正常區、fail→缺陷區
 """
 
 
@@ -49,3 +54,27 @@ def parse_command(text: str) -> dict:
             content = content[4:]
 
     return json.loads(content)
+
+
+def query_spec(product_name: str, inspection_items: list) -> dict:
+    rag_url = os.getenv("RAG_URL")
+    if not rag_url:
+        return {}
+    payload = {
+        "product_name": product_name,
+        "inspection_items": [i["name"] for i in inspection_items],
+    }
+    with httpx.Client(timeout=10) as client:
+        resp = client.post(rag_url, json=payload)
+        resp.raise_for_status()
+    return resp.json()
+
+
+def dispatch_robot(task: dict) -> bool:
+    robot_url = os.getenv("ROBOT_URL")
+    if not robot_url:
+        return False
+    with httpx.Client(timeout=10) as client:
+        resp = client.post(robot_url, json=task)
+        resp.raise_for_status()
+    return True

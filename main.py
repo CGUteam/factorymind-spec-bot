@@ -93,8 +93,8 @@ async def process(
         item_names = ", ".join(i["name"] for i in items)
         msg = (
             f"📡 ESP32 語音指令\n"
-            f"🎤 辨識：{text}\n\n"
-            f"📋 檢查任務：\n"
+            f"🎤 辨識（faster-whisper）：{text}\n\n"
+            f"📋 檢查任務（Ollama + Qwen2.5:7b）：\n"
             f"產品：{task.get('product_name', '未知')}\n"
             f"項目：{item_names}\n"
             f"狀態：{task.get('result', 'pending')}"
@@ -109,6 +109,40 @@ async def process(
         "language": asr_result.get("language"),
         "task": task,
     })
+
+
+@app.post("/inspection_result")
+async def inspection_result(request: Request):
+    """Robot 執行完畢後回傳結果，推 LINE 報告"""
+    data = await request.json()
+    product_name = data.get("product_name", "未知")
+    result       = data.get("result", "unknown")
+    items        = data.get("inspection_items", [])
+
+    result_icon = "✅" if result == "pass" else "❌"
+    placed_in   = data.get("placed_in", "")
+    items_str = "\n".join(
+        f"  {'✅' if i.get('pass') else '❌'} {i['name']}：{i.get('score', 0):.2f} "
+        f"（門檻 {i.get('threshold', 0.8):.2f}）"
+        for i in items
+    )
+    msg = (
+        f"📊 品管報告（SO-101 Robot）：\n"
+        f"產品：{product_name}\n"
+        f"結果：{result_icon} {'PASS' if result == 'pass' else 'FAIL'}\n"
+        f"放置：📦 {placed_in}\n\n"
+        f"檢查明細：\n{items_str}"
+    )
+
+    notify_user_id = os.getenv("LINE_NOTIFY_USER_ID")
+    if notify_user_id:
+        try:
+            line_bot.push(notify_user_id, msg)
+        except Exception as e:
+            print(f"[LINE] push failed: {e}")
+
+    print(f"[Result] {product_name}: {result}")
+    return {"status": "ok"}
 
 
 @app.post("/line/webhook")
