@@ -9,7 +9,7 @@
 - 王喻筠
 - [吳思聯](https://github.com/Poopogen)
 - [張舒茹](https://github.com/shuru921)
-- 謝易澄
+- [謝易澄](https://github.com/dean900334)
 
 ---
 
