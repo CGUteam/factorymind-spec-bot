@@ -107,7 +107,7 @@ ASR 文字經過 Qwen2.5:7b 解析後，產生以下結構。
 目前 Agent 解析出 `product_name` 和 `inspection_items` 後，  
 **下一步需要 RAG 根據 `product_name` 查詢對應的 Spec**，補充正確的 `threshold` 與檢查標準。
 
-建議 RAG 提供一個 HTTP endpoint，供 ASR 服務呼叫：
+RAG 服務需提供以下 endpoint 供 ASR 服務呼叫：
 
 ```
 POST /query_spec
@@ -122,6 +122,8 @@ Response:
 }
 ```
 
+> 詳細實作方式請參考 [RAG_GUIDE.md](./RAG_GUIDE.md)
+
 ---
 
 ### Robot 模組（給負責 Robot 的隊友）
@@ -130,7 +132,7 @@ RAG 補完 Spec 後，任務 JSON 會送給 Robot 執行。
 Robot 執行完畢後，請回傳結果更新 `result` 欄位：
 
 ```
-POST /inspection_result
+POST /inspection_result   （⚠️ 待實作，目前尚未開通）
 Body:
 {
   "product_name": "A產品",
@@ -141,7 +143,15 @@ Body:
 }
 ```
 
-結果會透過 LINE Push Message 回報給使用者。
+> 格式確認後，由 ASR 服務這邊開通此 endpoint，結果將透過 LINE Push Message 回報給使用者。
+
+---
+
+## 相關文件
+
+| 文件 | 說明 |
+|------|------|
+| [RAG_GUIDE.md](./RAG_GUIDE.md) | RAG Spec 查詢系統實作指南（給負責 RAG 的隊友） |
 
 ---
 
