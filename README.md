@@ -11,6 +11,13 @@
 - [張舒茹](https://github.com/shuru921)
 - [謝易澄](https://github.com/dean900334)
 
+## 📦 相關 Repository
+
+| 模組 | Repository | Branch |
+|------|-----------|--------|
+| Jetson ASR / OpenClaw Agent | [factorymind-spec-bot](https://github.com/CGUteam/factorymind-spec-bot) | `feature/asr-service` |
+| ESP32 智慧音箱韌體 | [nn-speaker](https://github.com/shuru921/nn-speaker) | `feature/jetson-asr` |
+
 ---
 
 ## 🚀 系統特色
