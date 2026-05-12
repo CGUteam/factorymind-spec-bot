@@ -1,7 +1,10 @@
 # 🎯 工廠自動品管系統
 
 本專案結合 **語音互動、RAG Spec 檢索、AI 視覺檢測與機器人品管**，打造一套智慧工廠品管系統。
+
 [專案簡介文件](https://docs.google.com/presentation/d/12SdQiO4NMRGlTFwFYpu5z8XlyqekW4OH1uCDH2WH9gQ/edit?usp=sharing)
+
+
 開發人員: 
 - 王喻筠
 - [吳思聯](https://github.com/Poopogen)
