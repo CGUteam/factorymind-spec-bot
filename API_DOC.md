@@ -38,6 +38,41 @@ LINE 回覆結果
 
 ---
 
+### `POST /process`
+
+**ESP32 智慧音箱專用端點。** 一次完成 ASR + Agent 解析，回傳結構化任務 JSON。
+
+**Content-Type：** `multipart/form-data`
+
+| 欄位 | 類型 | 必填 | 說明 |
+|------|------|------|------|
+| `file` | File | ✅ | 音訊檔（WAV 建議） |
+| `language` | string | ❌ | 語言代碼，預設自動偵測 |
+
+**Response**
+```json
+{
+  "text": "幫我檢查 A 產品的外觀缺陷",
+  "language": "zh",
+  "task": {
+    "product_name": "A產品",
+    "inspection_items": [
+      { "name": "外觀缺陷", "threshold": 0.8, "method": "vision_detection" }
+    ],
+    "result": "pending"
+  }
+}
+```
+
+**ESP32 呼叫範例（Arduino / C++）**
+```cpp
+HTTPClient http;
+http.begin("http://<jetson-ip>:8000/process");
+// multipart POST 傳送 WAV 音訊檔
+```
+
+---
+
 ### `POST /transcribe`
 
 上傳音訊檔，回傳語音辨識文字。

@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from linebot.v3.exceptions import InvalidSignatureError
 
 import asr
+import agent
 import line_bot
 
 load_dotenv()
@@ -58,6 +59,38 @@ async def transcribe(
         os.unlink(tmp_path)
 
     return JSONResponse(result)
+
+
+@app.post("/process")
+async def process(
+    file: UploadFile = File(...),
+    language: str = Form(default=None),
+):
+    """
+    ESP32 智慧音箱使用的整合端點。
+    傳入音訊 → ASR 辨識 → Agent 解析 → 回傳結構化任務 JSON。
+    """
+    suffix = os.path.splitext(file.filename or "audio.wav")[1] or ".wav"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        asr_result = asr.transcribe(tmp_path, language=language)
+        text = asr_result.get("text", "")
+        if not text:
+            return JSONResponse({"text": "", "task": None, "error": "無法辨識語音"})
+        task = agent.parse_command(text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        os.unlink(tmp_path)
+
+    return JSONResponse({
+        "text": text,
+        "language": asr_result.get("language"),
+        "task": task,
+    })
 
 
 @app.post("/line/webhook")
