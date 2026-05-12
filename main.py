@@ -120,7 +120,7 @@ async def inspection_result(request: Request):
     items        = data.get("inspection_items", [])
 
     result_icon = "✅" if result == "pass" else "❌"
-    placed_in   = data.get("placed_in", "")
+    placed_in   = data.get("placed_in") or ("正常區" if result == "pass" else "缺陷區")
     items_str = "\n".join(
         f"  {'✅' if i.get('pass') else '❌'} {i['name']}：{i.get('score', 0):.2f} "
         f"（門檻 {i.get('threshold', 0.8):.2f}）"
