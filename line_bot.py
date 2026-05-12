@@ -59,6 +59,16 @@ def _process_text(user_id: str, text: str) -> None:
         task = agent.parse_command(text)
         print(f"[Agent] task: {task}")
 
+        # 先推 Agent 任務訊息
+        items = task.get("inspection_items", [])
+        task_str = (
+            f"📋 檢查任務（Ollama + Qwen2.5:7b）：\n"
+            f"產品：{task.get('product_name', '未知')}\n"
+            f"項目：{', '.join(i['name'] for i in items)}\n"
+            f"狀態：查詢 Spec 中..."
+        )
+        _push(user_id, task_str)
+
         # 查 RAG
         try:
             spec = agent.query_spec(task["product_name"], task["inspection_items"])
@@ -72,15 +82,6 @@ def _process_text(user_id: str, text: str) -> None:
                 _push(user_id, f"🔍 Spec 查詢（RAG）：\n產品：{task.get('product_name')}\n{spec_str}")
         except Exception as e:
             print(f"[RAG] failed: {e}")
-
-        items = task.get("inspection_items", [])
-        task_str = (
-            f"📋 檢查任務（Ollama + Qwen2.5:7b）：\n"
-            f"產品：{task.get('product_name', '未知')}\n"
-            f"項目：{', '.join(i['name'] for i in items)}\n"
-            f"狀態：派送中..."
-        )
-        _push(user_id, task_str)
 
         # 派送給 Robot
         try:
@@ -114,6 +115,16 @@ def _process_audio(user_id: str, message_id: str, token: str) -> None:
         task = agent.parse_command(text)
         print(f"[Agent] task: {task}")
 
+        # 先推 Agent 任務訊息
+        items = task.get("inspection_items", [])
+        task_str = (
+            f"📋 檢查任務（Ollama + Qwen2.5:7b）：\n"
+            f"產品：{task.get('product_name', '未知')}\n"
+            f"項目：{', '.join(i['name'] for i in items)}\n"
+            f"狀態：查詢 Spec 中..."
+        )
+        _push(user_id, task_str)
+
         # 查 RAG 取得正確 Spec
         try:
             spec = agent.query_spec(task["product_name"], task["inspection_items"])
@@ -128,15 +139,6 @@ def _process_audio(user_id: str, message_id: str, token: str) -> None:
             print(f"[RAG] spec: {spec}")
         except Exception as e:
             print(f"[RAG] failed: {e}")
-
-        items = task.get("inspection_items", [])
-        task_str = (
-            f"📋 檢查任務（Ollama + Qwen2.5:7b）：\n"
-            f"產品：{task.get('product_name', '未知')}\n"
-            f"項目：{', '.join(i['name'] for i in items)}\n"
-            f"狀態：派送中..."
-        )
-        _push(user_id, task_str)
 
         # 派送給 Robot
         try:
