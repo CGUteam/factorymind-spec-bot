@@ -28,13 +28,16 @@ def get_handler() -> WebhookHandler:
     return _handler
 
 
-def _push(user_id: str, text: str) -> None:
+def push(user_id: str, text: str) -> None:
     _messaging_api.push_message(
         PushMessageRequest(
             to=user_id,
             messages=[TextMessage(type="text", text=text)],
         )
     )
+
+# 內部別名
+_push = push
 
 
 def _download_audio(message_id: str, token: str) -> str:

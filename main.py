@@ -68,7 +68,7 @@ async def process(
 ):
     """
     ESP32 智慧音箱使用的整合端點。
-    傳入音訊 → ASR 辨識 → Agent 解析 → 回傳結構化任務 JSON。
+    傳入音訊 → ASR 辨識 → Agent 解析 → 回傳 JSON 並推 LINE 通知。
     """
     suffix = os.path.splitext(file.filename or "audio.wav")[1] or ".wav"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
@@ -85,6 +85,24 @@ async def process(
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         os.unlink(tmp_path)
+
+    # 推 LINE 通知給使用者
+    notify_user_id = os.getenv("LINE_NOTIFY_USER_ID")
+    if notify_user_id:
+        items = task.get("inspection_items", [])
+        item_names = ", ".join(i["name"] for i in items)
+        msg = (
+            f"📡 ESP32 語音指令\n"
+            f"🎤 辨識：{text}\n\n"
+            f"📋 檢查任務：\n"
+            f"產品：{task.get('product_name', '未知')}\n"
+            f"項目：{item_names}\n"
+            f"狀態：{task.get('result', 'pending')}"
+        )
+        try:
+            line_bot.push(notify_user_id, msg)
+        except Exception as e:
+            print(f"[LINE] push failed: {e}")
 
     return JSONResponse({
         "text": text,
