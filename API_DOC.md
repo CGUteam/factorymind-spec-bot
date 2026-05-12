@@ -19,6 +19,7 @@ Qwen2.5:7b Agent → 結構化任務 JSON
   ↓
 LINE 回覆結果
 ```
+<img width="1290" height="675" alt="S__34521135_0" src="https://github.com/user-attachments/assets/66ed61e0-1ba2-4dc5-adef-8c374374daf2" />
 
 **輸入方式 B：ESP32 智慧音箱**
 ```
@@ -32,6 +33,7 @@ Qwen2.5:7b Agent → 結構化任務 JSON
   ↓
 LINE Push Message 通知使用者
 ```
+<img width="1290" height="581" alt="S__34521136_0" src="https://github.com/user-attachments/assets/c299661f-be0f-464f-9b12-3b1c55bac3d0" />
 
 **兩者共同的後續串接（待完成）：**
 ```
