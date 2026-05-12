@@ -1,19 +1,71 @@
 # OpenClaw ASR Service — API 文件
 
-> **服務位置（Jetson Orin 內網）：** `http://<jetson-ip>:8000`  
+> **服務位置（Jetson Orin 內網）：** `http://192.168.2.55:8000`  
 > **外網測試用（ngrok，每次重啟會變）：** `https://xxxx.ngrok-free.app`
+
+---
+
+## 團隊分工
+
+| 模組 | 負責人 | 位置 | 狀態 |
+|------|--------|------|------|
+| ASR + OpenClaw Agent | 張舒茹 | 實驗室（AI Office） | ✅ 完成 |
+| RAG Spec 查詢 | 隊友 A | 待確認 | ⬜ 開發中 |
+| Robot SO-101 | 隊友 B | 實驗室（AI Office） | ⬜ 開發中 |
 
 ---
 
 ## 系統架構
 
+**完整流程：**
+```
+LINE 語音 / 文字 / ESP32 音訊
+          ↓
+   POST /line/webhook 或 /process
+          ↓
+🎤 faster-whisper ASR → 文字
+          ↓
+📋 Ollama + Qwen2.5:7b → 結構化任務 JSON
+          ↓
+🔍 RAG Spec 查詢（POST /query_spec）→ 補充 threshold / 標準
+          ↓
+🤖 Robot 執行（POST /inspection_task）→ 手臂抓取、拍照、AI 判斷
+          ↓
+📊 POST /inspection_result 回傳結果
+          ↓
+LINE Push Message 品管報告
+```
+
+**LINE 訊息範例：**
+```
+🎤 辨識（faster-whisper）：
+幫我檢查A產品是否有缺陷，有的話放到缺陷區
+
+🔍 Spec 查詢（RAG）：
+產品：A產品
+  • 外觀缺陷：門檻 0.85｜無明顯刮痕、壓痕、異色
+
+📋 檢查任務（Ollama + Qwen2.5:7b）：
+產品：A產品
+項目：外觀缺陷
+狀態：派送中...
+
+📊 品管報告（SO-101 Robot）：
+產品：A產品
+結果：✅ PASS
+放置：📦 正常區
+
+檢查明細：
+  ✅ 外觀缺陷：0.91（門檻 0.85）
+```
+
 **輸入方式 A：LINE Bot**
 ```
-LINE 語音訊息
+LINE 語音 / 文字訊息
   ↓
 POST /line/webhook
   ↓
-Whisper ASR → 文字
+Whisper ASR → 文字（語音）或直接解析（文字）
   ↓
 Qwen2.5:7b Agent → 結構化任務 JSON
   ↓
@@ -23,7 +75,7 @@ LINE 回覆結果
 
 **輸入方式 B：ESP32 智慧音箱**
 ```
-ESP32 麥克風錄音（WAV）
+ESP32 按住按鈕錄音（WAV）
   ↓
 POST /process
   ↓
@@ -35,16 +87,18 @@ LINE Push Message 通知使用者
 ```
 <img width="1290" height="581" alt="S__34521136_0" src="https://github.com/user-attachments/assets/c299661f-be0f-464f-9b12-3b1c55bac3d0" />
 
-**兩者共同的後續串接（待完成）：**
+---
+
+## Demo 當天網路架構
+
 ```
-結構化任務 JSON
-  ↓
-[待串接] RAG Spec 查詢
-  ↓
-[待串接] Robot 執行
-  ↓
-LINE 回報最終結果
+手機熱點
+  ├── 你的 Jetson（ASR, :8000）
+  ├── 隊友 B 的 Jetson（Robot, :PORT）
+  └── ESP32 智慧音箱
 ```
+
+> RAG 位置待確認，目前以 Mock Server（:8001）替代
 
 ---
 
@@ -82,20 +136,10 @@ LINE 回報最終結果
     "inspection_items": [
       { "name": "外觀缺陷", "threshold": 0.8, "method": "vision_detection" }
     ],
+    "placement": { "pass": "正常區", "fail": "缺陷區" },
     "result": "pending"
   }
 }
-```
-
-**處理完成後自動推送 LINE 訊息格式：**
-```
-📡 ESP32 語音指令
-🎤 辨識：幫我檢查 A 產品的外觀缺陷
-
-📋 檢查任務：
-產品：A產品
-項目：外觀缺陷
-狀態：pending
 ```
 
 **ESP32 呼叫範例（Arduino / C++）**
@@ -135,6 +179,29 @@ curl -X POST http://<jetson-ip>:8000/transcribe \
 
 ---
 
+### `POST /inspection_result`
+
+**Robot 執行完畢後呼叫此 endpoint 回傳結果**，Jetson 收到後推 LINE 品管報告。
+
+**Request**
+```json
+{
+  "product_name": "A產品",
+  "inspection_items": [
+    { "name": "外觀缺陷", "score": 0.92, "threshold": 0.85, "pass": true }
+  ],
+  "placed_in": "正常區",
+  "result": "pass"
+}
+```
+
+**Response**
+```json
+{ "status": "ok" }
+```
+
+---
+
 ## 任務 JSON 格式（Agent 輸出）
 
 ASR 文字經過 Qwen2.5:7b 解析後，產生以下結構。  
@@ -150,6 +217,10 @@ ASR 文字經過 Qwen2.5:7b 解析後，產生以下結構。
       "method": "vision_detection"
     }
   ],
+  "placement": {
+    "pass": "正常區",
+    "fail": "缺陷區"
+  },
   "result": "pending"
 }
 ```
@@ -161,11 +232,9 @@ ASR 文字經過 Qwen2.5:7b 解析後，產生以下結構。
 | `inspection_items[].name` | string | 檢查項目名稱 |
 | `inspection_items[].threshold` | float | 允收門檻（0~1） |
 | `inspection_items[].method` | string | `vision_detection` 或 `manual` |
+| `placement.pass` | string | 合格時放置區域 |
+| `placement.fail` | string | 不合格時放置區域 |
 | `result` | string | `pending` / `pass` / `fail` |
-
-**method 判斷規則：**
-- 外觀、缺陷、尺寸、顏色相關 → `vision_detection`
-- 其他 → `manual`
 
 ---
 
@@ -173,10 +242,9 @@ ASR 文字經過 Qwen2.5:7b 解析後，產生以下結構。
 
 ### RAG Spec 模組（給負責 RAG 的隊友）
 
-目前 Agent 解析出 `product_name` 和 `inspection_items` 後，  
-**下一步需要 RAG 根據 `product_name` 查詢對應的 Spec**，補充正確的 `threshold` 與檢查標準。
+Agent 解析出 `product_name` 和 `inspection_items` 後，呼叫 RAG 補充正確的 `threshold` 與檢查標準。
 
-RAG 服務需提供以下 endpoint 供 ASR 服務呼叫：
+**RAG 服務需提供：**
 
 ```
 POST /query_spec
@@ -191,28 +259,54 @@ Response:
 }
 ```
 
+**串接方式：** 告知你的服務 IP 和 Port，更新 Jetson 的 `.env`：
+```
+RAG_URL=http://<你的IP>:<PORT>/query_spec
+```
+
 > 詳細實作方式請參考 [RAG_GUIDE.md](./RAG_GUIDE.md)
 
 ---
 
 ### Robot 模組（給負責 Robot 的隊友）
 
-RAG 補完 Spec 後，任務 JSON 會送給 Robot 執行。  
-Robot 執行完畢後，請回傳結果更新 `result` 欄位：
+RAG 補完 Spec 後，任務 JSON 送給 Robot 執行。
+
+**Robot 服務需提供：**
 
 ```
-POST /inspection_result   （⚠️ 待實作，目前尚未開通）
+POST /inspection_task
 Body:
 {
   "product_name": "A產品",
   "inspection_items": [
-    { "name": "外觀缺陷", "score": 0.92, "pass": true }
+    { "name": "外觀缺陷", "threshold": 0.85, "method": "vision_detection" }
   ],
+  "placement": { "pass": "正常區", "fail": "缺陷區" }
+}
+
+Response: { "status": "accepted" }
+```
+
+**執行完畢後，Robot 需回傳結果：**
+
+```
+POST http://192.168.2.55:8000/inspection_result
+Body:
+{
+  "product_name": "A產品",
+  "inspection_items": [
+    { "name": "外觀缺陷", "score": 0.92, "threshold": 0.85, "pass": true }
+  ],
+  "placed_in": "正常區",
   "result": "pass"
 }
 ```
 
-> 格式確認後，由 ASR 服務這邊開通此 endpoint，結果將透過 LINE Push Message 回報給使用者。
+**串接方式：** 告知你的服務 IP 和 Port，更新 Jetson 的 `.env`：
+```
+ROBOT_URL=http://<你的IP>:<PORT>/inspection_task
+```
 
 ---
 
@@ -233,4 +327,6 @@ Body:
 | LLM | Ollama + Qwen2.5:7b |
 | Python 環境 | conda `openclaw_env` (Python 3.11) |
 | 服務 Port | 8000 |
+| Mock RAG Port | 8001 |
+| Mock Robot Port | 8002 |
 | Ollama Port | 11434 |
