@@ -1,5 +1,6 @@
 import os
 import tempfile
+import threading
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -14,6 +15,7 @@ import agent
 import line_bot
 from app.command_parser import parse_command as parse_product_command
 from app.product_retriever import retrieve_product
+from app.rag_retriever import _ensure_product_embeddings
 
 load_dotenv()
 
@@ -29,6 +31,8 @@ async def lifespan(app: FastAPI):
         channel_secret=os.getenv("LINE_CHANNEL_SECRET", ""),
         channel_access_token=os.getenv("LINE_CHANNEL_ACCESS_TOKEN", ""),
     )
+    # 背景預熱 bge-m3 product embeddings，避免第一次查詢才建
+    threading.Thread(target=_ensure_product_embeddings, daemon=True).start()
     yield
 
 
