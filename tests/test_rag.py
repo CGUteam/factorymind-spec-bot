@@ -116,8 +116,8 @@ class TestQuerySpecEndpoint:
         assert item["threshold"] == 0.80
         assert item["standard"] == "無明顯缺陷"
 
-    def test_unknown_product_returns_defaults(self, client):
-        """找不到的產品，所有項目應回傳預設 spec，不崩潰。"""
+    def test_unknown_product_returns_not_found(self, client):
+        """找不到的產品，應回傳 product_found=False，不崩潰。"""
         with patch("app.rag_retriever._get_embedding", return_value=None):
             resp = client.post("/query_spec", json={
                 "product_name": "不存在的產品",
@@ -125,8 +125,16 @@ class TestQuerySpecEndpoint:
             })
         assert resp.status_code == 200
         data = resp.json()
-        for item in data["inspection_items"]:
-            assert item["threshold"] == 0.80
+        assert data["product_found"] is False
+
+    def test_known_product_returns_product_found_true(self, client):
+        """已知產品應回傳 product_found=True。"""
+        resp = client.post("/query_spec", json={
+            "product_name": "藍色方塊",
+            "inspection_items": ["外觀缺陷"],
+        })
+        assert resp.status_code == 200
+        assert resp.json()["product_found"] is True
 
     def test_color_shape_fallback_via_endpoint(self, client):
         """LLM 輸出顏色+形狀描述（非完整名稱）時，應能靠規則比對到產品。"""

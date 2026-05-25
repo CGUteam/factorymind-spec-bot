@@ -73,6 +73,9 @@ def _process_text(user_id: str, text: str) -> None:
         # 查 RAG
         try:
             spec = agent.query_spec(task["product_name"], task["inspection_items"])
+            if not spec.get("product_found", True):
+                _push(user_id, f"⚠️ 找不到「{task.get('product_name')}」的產品規格，請確認產品名稱後重試")
+                return
             if spec.get("inspection_items"):
                 task["inspection_items"] = spec["inspection_items"]
                 spec_items = spec["inspection_items"]
@@ -136,6 +139,9 @@ def _process_audio(user_id: str, message_id: str, token: str) -> None:
         # 查 RAG 取得正確 Spec
         try:
             spec = agent.query_spec(task["product_name"], task["inspection_items"])
+            if not spec.get("product_found", True):
+                _push(user_id, f"⚠️ 找不到「{task.get('product_name')}」的產品規格，請確認產品名稱後重試")
+                return
             if spec.get("inspection_items"):
                 task["inspection_items"] = spec["inspection_items"]
                 spec_items = spec["inspection_items"]

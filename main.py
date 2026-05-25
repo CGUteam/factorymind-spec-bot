@@ -84,10 +84,11 @@ def query_spec(req: QuerySpecRequest) -> dict[str, Any]:
             else:
                 result.append({"name": item_name, **DEFAULT_SPEC})
 
+    product_found = product is not None
     resolved_name = product["product_name"] if product else req.product_name
     matched_by = retrieval["matched_by"] if retrieval else "not_found"
     print(f"[RAG] {resolved_name} ({matched_by}) → {[i['name'] for i in result]}")
-    return {"product_name": resolved_name, "inspection_items": result}
+    return {"product_name": resolved_name, "product_found": product_found, "inspection_items": result}
 
 
 @app.post("/transcribe")
