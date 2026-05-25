@@ -82,6 +82,7 @@ def _process_text(user_id: str, text: str) -> None:
                 _push(user_id, f"🔍 Spec 查詢（RAG）：\n產品：{task.get('product_name')}\n{spec_str}")
         except Exception as e:
             print(f"[RAG] failed: {e}")
+            _push(user_id, "⚠️ Spec 查詢失敗，將使用預設門檻繼續")
 
         # 派送給 Robot
         try:
@@ -139,6 +140,7 @@ def _process_audio(user_id: str, message_id: str, token: str) -> None:
             print(f"[RAG] spec: {spec}")
         except Exception as e:
             print(f"[RAG] failed: {e}")
+            _push(user_id, "⚠️ Spec 查詢失敗，將使用預設門檻繼續")
 
         # 派送給 Robot
         try:
