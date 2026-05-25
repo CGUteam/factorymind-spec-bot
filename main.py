@@ -1,15 +1,19 @@
 import os
 import tempfile
 from contextlib import asynccontextmanager
+from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Header, Request
 from fastapi.responses import JSONResponse
 from linebot.v3.exceptions import InvalidSignatureError
+from pydantic import BaseModel
 
 import asr
 import agent
 import line_bot
+from app.command_parser import parse_command as parse_product_command
+from app.product_retriever import retrieve_product
 
 load_dotenv()
 
@@ -31,9 +35,47 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="OpenClaw ASR Service", lifespan=lifespan)
 
 
+class QuerySpecRequest(BaseModel):
+    product_name: str
+    inspection_items: list[str]
+
+
+DEFAULT_SPEC: dict[str, Any] = {
+    "threshold": 0.80,
+    "method": "vision_detection",
+    "standard": "無明顯缺陷",
+}
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/query_spec")
+def query_spec(req: QuerySpecRequest) -> dict[str, Any]:
+    parsed = parse_product_command(req.product_name)
+    retrieval = retrieve_product(req.product_name, parsed)
+
+    if retrieval is None:
+        product = None
+        inspection_specs: dict[str, Any] = {}
+    else:
+        product = retrieval["product"]
+        inspection_specs = product.get("inspection_specs", {})
+
+    result = []
+    for item_name in req.inspection_items:
+        if item_name in inspection_specs:
+            spec = inspection_specs[item_name]
+            result.append({"name": item_name, **spec})
+        else:
+            result.append({"name": item_name, **DEFAULT_SPEC})
+
+    resolved_name = product["product_name"] if product else req.product_name
+    matched_by = retrieval["matched_by"] if retrieval else "not_found"
+    print(f"[RAG] {resolved_name} ({matched_by}) → {[i['name'] for i in result]}")
+    return {"product_name": resolved_name, "inspection_items": result}
 
 
 @app.post("/transcribe")

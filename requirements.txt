@@ -4,3 +4,4 @@ uvicorn
 soundfile
 numpy
 python-multipart
+requests

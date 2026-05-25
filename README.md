@@ -82,13 +82,17 @@ Robot System (SO-101 Arm + Camera + AI Model)
 
 ### 4️⃣ RAG Spec 檢索
 
-支援資料來源：
-- PDF / Excel / CSV / JSON
+實作於 `app/` 模組，採三層查詢策略：
 
-技術：
-- Embedding：bge-m3 / e5
-- Vector DB：FAISS / Qdrant
-- Framework：LlamaIndex / LangChain / GraphRAG
+| 優先順序 | 方式 | 說明 |
+|---------|------|------|
+| 1 | 精準名稱比對 | 文字中包含 `product_name` |
+| 2 | 顏色 + 形狀規則 | 從文字推斷顏色與形狀 |
+| 3 | RAG fallback | Ollama `bge-m3` embedding + cosine similarity（threshold 0.5）|
+
+產品規格資料：`data/products.json`，每筆包含 `inspection_specs`（外觀缺陷、尺寸、重量、顏色的 threshold / method / standard）。
+
+端點：`POST /query_spec`（與主服務同一 port，不需獨立服務）
 
 ---
 
@@ -184,6 +188,44 @@ POST /inspection_result
 
 ---
 
+## ⚙️ 環境設定
+
+複製並填寫 `.env`：
+
+```env
+# LINE Bot
+LINE_CHANNEL_SECRET=
+LINE_CHANNEL_ACCESS_TOKEN=
+LINE_NOTIFY_USER_ID=
+
+# Whisper ASR
+WHISPER_MODEL=small
+WHISPER_DEVICE=cpu
+WHISPER_COMPUTE=int8
+
+# 產品規格查詢（與主服務同一 port，不需獨立 RAG 服務）
+RAG_URL=http://localhost:8000/query_spec
+
+# Robot
+ROBOT_URL=http://localhost:8002/inspection_task
+```
+
+## 🚀 啟動方式
+
+```bash
+# 確認 Ollama 已啟動並安裝 bge-m3（RAG fallback 用）
+ollama pull bge-m3
+
+# 一鍵啟動服務 + ngrok 公開 URL
+./start.sh
+```
+
+啟動後終端會印出 LINE Webhook URL，貼到 LINE Developers 後台即可。
+
+> ngrok 免費版每次重啟 URL 會變，需重新更新 LINE Webhook 設定。
+
+---
+
 ## 📦 硬體需求
 
 | 類別 | 設備 |
@@ -204,7 +246,7 @@ POST /inspection_result
 - ✅ LINE Bot 語音輸入整合
 - ✅ OpenClaw Agent 指令解析（Ollama + Qwen2.5:7b）
 - ✅ 結構化任務 JSON 輸出
-- ⬜ RAG Spec 查詢串接
+- ✅ RAG Spec 查詢串接（三層查詢 + bge-m3，整合於主服務）
 - ⬜ 模擬結果回傳 LINE
 
 ### Phase 2
