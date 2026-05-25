@@ -1,184 +1,116 @@
-# RAG Spec 查詢系統 — 實作指南
+# RAG Spec 查詢系統 — 實作說明
 
-> 本文件給負責 RAG Spec 查詢模組的隊友參考。
+> RAG 已整合於主服務（`app/` 模組），本文件說明實作細節與如何維護產品規格資料。
 
 ---
 
-## RAG 是什麼
+## 架構概覽
 
-**RAG = Retrieval-Augmented Generation（檢索增強生成）**
-
-不用 RAG 的問題：
 ```
-問 LLM：「A產品外觀缺陷的 threshold 是多少？」
-LLM：「我不知道，這是你們公司內部資料」
-```
-
-用 RAG 的流程：
-```
-1. 先去產品規格書（PDF/Excel）裡搜尋「A產品 外觀缺陷」
-2. 找到相關段落：「外觀缺陷允收標準：0.85」
-3. 把這段資料丟給 LLM
-4. LLM 根據這段資料回答正確答案
+POST /query_spec
+      ↓
+app/command_parser.py   → 從產品名稱文字解析關鍵字
+      ↓
+app/product_retriever.py → 三層查詢
+  ├── Tier 1：精準名稱比對       → matched_by: exact_name
+  ├── Tier 2：顏色 + 形狀規則    → matched_by: color_shape_rule
+  └── Tier 3：bge-m3 RAG fallback → matched_by: rag_bge_m3
+      ↓
+data/products.json → 回傳對應 inspection_specs
 ```
 
 ---
 
-## 系統架構
+## 產品規格資料（data/products.json）
 
+每筆產品格式如下：
+
+```json
+{
+  "product_id": "P001",
+  "product_name": "藍色方塊",
+  "weight": 100,
+  "color": "藍色",
+  "shape": "方塊",
+  "size": {"length": 5, "width": 5, "height": 5, "unit": "cm"},
+  "inspection_specs": {
+    "外觀缺陷": {"threshold": 0.85, "method": "vision_detection", "standard": "無明顯刮痕、壓痕、異色"},
+    "尺寸":     {"threshold": 0.95, "method": "vision_detection", "standard": "邊長誤差 ±0.5mm 以內"},
+    "重量":     {"threshold": 0.90, "method": "manual",           "standard": "100g ±5g"},
+    "顏色":     {"threshold": 0.90, "method": "vision_detection", "standard": "色差 ΔE < 2.0"}
+  }
+}
 ```
-產品規格文件（PDF / Excel / CSV）
-        ↓
-   切成小段（Chunking）
-        ↓
-   Embedding 模型轉成向量
-        ↓
-   存進 Vector DB（FAISS / Qdrant）
-        ↓
-收到查詢請求（product_name + inspection_items）
-        ↓
-   在 Vector DB 搜尋最相關段落
-        ↓
-   丟給 LLM 整理成結構化資料
-        ↓
-   回傳 threshold 和標準
-```
+
+### 新增產品
+
+直接在 `data/products.json` 新增一筆，重啟服務即生效。
+
+### method 規則
+
+| 檢查類型 | method |
+|---------|--------|
+| 外觀、缺陷、尺寸、顏色 | `vision_detection` |
+| 重量、其他 | `manual` |
 
 ---
 
-## 推薦技術選擇
-
-| 用途 | 推薦 | 理由 |
-|------|------|------|
-| RAG 框架 | LlamaIndex | 文件處理最方便，支援 PDF/Excel |
-| Embedding | bge-m3 | 支援中文，本地跑 |
-| Vector DB | FAISS | 輕量，不用架服務 |
-| LLM | Ollama + Qwen2.5:7b | 跟系統現有的一樣 |
-| API | FastAPI | 跟 ASR 服務風格一致 |
-
----
-
-## API 規格（必須對齊）
-
-ASR 服務會呼叫你的 RAG API，格式如下：
+## API 規格
 
 ### `POST /query_spec`
 
 **Request**
 ```json
 {
-  "product_name": "A產品",
-  "inspection_items": ["外觀缺陷", "尺寸"]
+  "product_name": "藍色方塊",
+  "inspection_items": ["外觀缺陷", "重量"]
 }
 ```
 
 **Response**
 ```json
 {
-  "product_name": "A產品",
+  "product_name": "藍色方塊",
   "inspection_items": [
-    {
-      "name": "外觀缺陷",
-      "threshold": 0.85,
-      "method": "vision_detection",
-      "standard": "無明顯刮痕、壓痕、異色"
-    },
-    {
-      "name": "尺寸",
-      "threshold": 0.95,
-      "method": "vision_detection",
-      "standard": "長寬誤差 ±0.5mm 以內"
-    }
+    {"name": "外觀缺陷", "threshold": 0.85, "method": "vision_detection", "standard": "無明顯刮痕、壓痕、異色"},
+    {"name": "重量",     "threshold": 0.90, "method": "manual",           "standard": "100g ±5g"}
   ]
 }
 ```
 
----
-
-## 建議實作方式
-
-### 方式 A：結構化查表（推薦先做）
-
-如果規格是 Excel / CSV，**不需要 RAG**，直接查表最準確，數值不會被 LLM 亂生。
-
-```python
-# spec_db.csv 格式範例：
-# product_name, item, threshold, method, standard
-# A產品, 外觀缺陷, 0.85, vision_detection, 無明顯刮痕
-
-import pandas as pd
-from fastapi import FastAPI
-from pydantic import BaseModel
-
-app = FastAPI()
-df = pd.read_csv("spec_db.csv")
-
-class QueryRequest(BaseModel):
-    product_name: str
-    inspection_items: list[str]
-
-@app.post("/query_spec")
-def query_spec(req: QueryRequest):
-    items = []
-    for item_name in req.inspection_items:
-        row = df[
-            (df["product_name"] == req.product_name) &
-            (df["item"] == item_name)
-        ]
-        if not row.empty:
-            items.append({
-                "name": item_name,
-                "threshold": float(row.iloc[0]["threshold"]),
-                "method": row.iloc[0]["method"],
-                "standard": row.iloc[0]["standard"],
-            })
-    return {"product_name": req.product_name, "inspection_items": items}
-```
-
-### 方式 B：完整 RAG（規格是非結構化文件時使用）
-
-規格書是 PDF / Word 等非結構化格式時，才需要完整 RAG 流程。
-
-```python
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-
-# 1. 載入文件
-documents = SimpleDirectoryReader("./specs/").load_data()
-
-# 2. 建立 Embedding + Index
-embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3")
-index = VectorStoreIndex.from_documents(documents, embed_model=embed_model)
-
-# 3. 查詢
-query_engine = index.as_query_engine()
-response = query_engine.query("A產品外觀缺陷的允收標準是什麼？")
-```
+> 若 `product_name` 對應不到任何產品，或請求的 `inspection_items` 在該產品規格中不存在，一律回傳預設值：`threshold: 0.80 / method: vision_detection / standard: 無明顯缺陷`
 
 ---
 
-## 建議開發順序
+## 三層查詢說明
 
-1. **先用方式 A（查表）** — 快速讓整個系統跑通
-2. **確認 API 格式與 ASR 服務對齊** — 用上方的 Request / Response 格式
-3. **之後再升級成方式 B（RAG）** — 支援更複雜的非結構化規格書
+### Tier 1：精準名稱比對
+`product_name` 文字中包含 `products.json` 裡的完整產品名稱，直接回傳。
+
+### Tier 2：顏色 + 形狀規則
+從文字中抽出顏色（藍色、紅色…）和形狀（方塊、圓球…），比對出對應產品。
+
+### Tier 3：bge-m3 RAG fallback
+前兩層都找不到時，用 Ollama `bge-m3` 將查詢文字和產品資料轉成向量，計算 cosine similarity，相似度 ≥ 0.5 才回傳結果。
+
+> Ollama 未啟動或 bge-m3 未安裝時，Tier 3 會自動跳過，不影響前兩層。
 
 ---
 
-## 安裝套件
+## 模組檔案
+
+| 檔案 | 功能 |
+|------|------|
+| `app/command_parser.py` | 解析產品名稱與屬性關鍵字 |
+| `app/product_loader.py` | 載入 `data/products.json`（有 LRU 快取）|
+| `app/product_retriever.py` | 三層查詢邏輯 |
+| `app/rag_retriever.py` | bge-m3 embedding + cosine similarity |
+| `data/products.json` | 產品規格資料 |
+
+---
+
+## 測試
 
 ```bash
-conda activate openclaw_env
-
-# 方式 A（查表）
-pip install fastapi uvicorn pandas
-
-# 方式 B（完整 RAG）
-pip install llama-index llama-index-embeddings-huggingface faiss-cpu
+/home/cluster/miniconda3/envs/openclaw_env/bin/python -m pytest tests/test_rag.py -v
 ```
-
----
-
-## 聯絡
-
-串接問題請參考 `API_DOC.md`，或直接找負責 ASR 模組的隊友。

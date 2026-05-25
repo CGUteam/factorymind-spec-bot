@@ -10,7 +10,7 @@
 | 模組 | 負責人 | 位置 | 狀態 |
 |------|--------|------|------|
 | ASR + OpenClaw Agent | 張舒茹 | 實驗室（AI Office） | ✅ 完成 |
-| RAG Spec 查詢 | 隊友 A | 待確認 | ⬜ 開發中 |
+| RAG Spec 查詢 | 張舒茹 | 整合於主服務（port 8000） | ✅ 完成 |
 | Robot SO-101 | 隊友 B | 實驗室（AI Office） | ⬜ 開發中 |
 
 ---
@@ -99,7 +99,7 @@ LINE Push Message 通知使用者
   └── ESP32 智慧音箱
 ```
 
-> RAG 位置待確認，目前以 Mock Server（:8001）替代
+> RAG 已整合於主服務（port 8000），`POST /query_spec` 直接提供 Spec 查詢
 
 ---
 
@@ -241,31 +241,20 @@ ASR 文字經過 Qwen2.5:7b 解析後，產生以下結構。
 
 ## 串接說明
 
-### RAG Spec 模組（給負責 RAG 的隊友）
+### RAG Spec 模組
 
-Agent 解析出 `product_name` 和 `inspection_items` 後，呼叫 RAG 補充正確的 `threshold` 與檢查標準。
+RAG 已整合於主服務，`POST /query_spec` 直接可用，不需要另外架設服務。
 
-**RAG 服務需提供：**
+Agent 解析出 `product_name` 和 `inspection_items` 後，自動呼叫 `/query_spec` 補充 `threshold` 與檢查標準。
 
-```
-POST /query_spec
-Body: { "product_name": "A產品", "inspection_items": ["外觀缺陷"] }
+**查詢策略（三層）：**
+1. 精準名稱比對
+2. 顏色 + 形狀規則比對
+3. bge-m3 embedding RAG fallback
 
-Response:
-{
-  "product_name": "A產品",
-  "inspection_items": [
-    { "name": "外觀缺陷", "threshold": 0.85, "method": "vision_detection", "standard": "無明顯刮痕" }
-  ]
-}
-```
+**新增或修改產品規格：** 編輯 `data/products.json`
 
-**串接方式：** 告知你的服務 IP 和 Port，更新 Jetson 的 `.env`：
-```
-RAG_URL=http://<你的IP>:<PORT>/query_spec
-```
-
-> 詳細實作方式請參考 [RAG_GUIDE.md](./RAG_GUIDE.md)
+> 詳細說明請參考 [RAG_GUIDE.md](./RAG_GUIDE.md)
 
 ---
 
@@ -328,6 +317,5 @@ ROBOT_URL=http://<你的IP>:<PORT>/inspection_task
 | LLM | Ollama + Qwen2.5:7b |
 | Python 環境 | conda `openclaw_env` (Python 3.11) |
 | 服務 Port | 8000 |
-| Mock RAG Port | 8001 |
 | Mock Robot Port | 8002 |
 | Ollama Port | 11434 |
