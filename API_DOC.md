@@ -9,8 +9,8 @@
 
 | 模組 | 負責人 | 位置 | 狀態 |
 |------|--------|------|------|
-| ASR + OpenClaw Agent | 張舒茹 | 實驗室（AI Office） | ✅ 完成 |
-| RAG Spec 查詢 | 張舒茹 | 整合於主服務（port 8000） | ✅ 完成 |
+| ASR + OpenClaw Agent + 串接 | 張舒茹 | 實驗室（AI Office） | ✅ 完成 |
+| RAG Spec 查詢 | 謝易澄 | 整合於主服務（port 8000） | ✅ 完成 |
 | Robot SO-101 | 隊友 B | 實驗室（AI Office） | ⬜ 開發中 |
 
 ---
