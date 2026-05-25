@@ -67,10 +67,11 @@ data/products.json → 回傳對應 inspection_specs
 }
 ```
 
-**Response**
+**Response（找到產品）**
 ```json
 {
   "product_name": "藍色方塊",
+  "product_found": true,
   "inspection_items": [
     {"name": "外觀缺陷", "threshold": 0.85, "method": "vision_detection", "standard": "無明顯刮痕、壓痕、異色"},
     {"name": "重量",     "threshold": 0.90, "method": "manual",           "standard": "100g ±5g"}
@@ -78,7 +79,17 @@ data/products.json → 回傳對應 inspection_specs
 }
 ```
 
-> 若 `product_name` 對應不到任何產品，或請求的 `inspection_items` 在該產品規格中不存在，一律回傳預設值：`threshold: 0.80 / method: vision_detection / standard: 無明顯缺陷`
+**Response（找不到產品）**
+```json
+{
+  "product_name": "紫色星星",
+  "product_found": false,
+  "inspection_items": [...]
+}
+```
+
+> `product_found: false` 時，LINE Bot 會停止流程並通知使用者，**不會派送給 Robot**。  
+> `product_found: true` 但某個 `inspection_items` 不在該產品規格中，回傳預設值：`threshold: 0.80 / method: vision_detection / standard: 無明顯缺陷`
 
 ---
 
