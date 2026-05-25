@@ -14,6 +14,7 @@ import agent
 
 _handler = None
 _messaging_api = None
+_pending_asr: dict[str, str] = {}  # user_id → 待確認的辨識文字
 
 
 def init(channel_secret: str, channel_access_token: str) -> None:
@@ -109,6 +110,12 @@ def _process_audio(user_id: str, message_id: str, token: str) -> None:
             _push(user_id, "（無法辨識，請再說一次）")
             return
 
+        # ASR_CONFIRM=true 時暫存辨識結果等使用者確認（測試用），預設直接繼續
+        if os.getenv("ASR_CONFIRM", "false").lower() == "true":
+            _pending_asr[user_id] = text
+            _push(user_id, f"🎤 辨識（faster-whisper）：\n{text}\n\n請回覆「確認」繼續，或「取消」放棄")
+            return
+
         _push(user_id, f"🎤 辨識（faster-whisper）：\n{text}")
 
         # Agent 解析指令
@@ -173,7 +180,29 @@ def _register_handlers() -> None:
     @_handler.add(MessageEvent, message=TextMessageContent)
     def handle_text(event: MessageEvent) -> None:
         text = event.message.text.strip()
-        # 立刻回覆，背景處理避免 timeout
+        user_id = event.source.user_id
+
+        # 處理 ASR 確認回覆
+        if user_id in _pending_asr:
+            pending_text = _pending_asr.pop(user_id)
+            if text in ("確認", "ok", "OK"):
+                _messaging_api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(type="text", text=f"📝 確認指令：{pending_text}\n處理中...")],
+                    )
+                )
+                threading.Thread(target=_process_text, args=(user_id, pending_text), daemon=True).start()
+            else:
+                _messaging_api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(type="text", text="已取消")],
+                    )
+                )
+            return
+
+        # 一般文字指令
         _messaging_api.reply_message(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
@@ -182,6 +211,6 @@ def _register_handlers() -> None:
         )
         threading.Thread(
             target=_process_text,
-            args=(event.source.user_id, text),
+            args=(user_id, text),
             daemon=True,
         ).start()
