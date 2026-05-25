@@ -5,3 +5,5 @@ soundfile
 numpy
 python-multipart
 requests
+pytest
+pytest-asyncio

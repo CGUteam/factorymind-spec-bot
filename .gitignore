@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.log
+
+# DLA 原始資料（已整合進 app/）
+DLA_project/
+DLA_project.zip

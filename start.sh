@@ -32,13 +32,13 @@ ASR_PID=$!
 
 # 等待服務就緒
 echo "      等待模型載入..."
-for i in $(seq 1 30); do
+for i in $(seq 1 60); do
     sleep 2
     if curl -sf http://localhost:$PORT/health > /dev/null 2>&1; then
         echo "      ASR 服務就緒 (PID $ASR_PID)"
         break
     fi
-    if [ $i -eq 30 ]; then
+    if [ $i -eq 60 ]; then
         echo "[ERROR] ASR 服務啟動逾時"
         kill $ASR_PID 2>/dev/null
         exit 1
