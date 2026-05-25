@@ -27,6 +27,7 @@ SYSTEM_PROMPT = """你是工廠品管助理（OpenClaw Agent）。
 }
 
 規則：
+- inspection_items name：使用最短的名詞，不加「檢查」、「檢測」等動詞後綴（例如：「重量」而非「重量檢查」，「外觀缺陷」而非「外觀缺陷檢查」）
 - method：外觀、缺陷、尺寸、顏色 → vision_detection；其他 → manual
 - placement：從語音中判斷合格放哪區、不合格放哪區；若未提及則預設 pass→正常區、fail→缺陷區
 """
@@ -41,7 +42,7 @@ def parse_command(text: str) -> dict:
         ],
         "temperature": 0.1,
     }
-    with httpx.Client(timeout=30) as client:
+    with httpx.Client(timeout=120) as client:
         resp = client.post(OLLAMA_URL, json=payload)
         resp.raise_for_status()
 

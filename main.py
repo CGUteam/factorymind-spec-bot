@@ -70,7 +70,15 @@ def query_spec(req: QuerySpecRequest) -> dict[str, Any]:
             spec = inspection_specs[item_name]
             result.append({"name": item_name, **spec})
         else:
-            result.append({"name": item_name, **DEFAULT_SPEC})
+            # LLM 可能在項目名稱後加「檢查」等後綴，嘗試部分比對
+            fuzzy = next(
+                (spec for key, spec in inspection_specs.items() if key in item_name or item_name in key),
+                None,
+            )
+            if fuzzy:
+                result.append({"name": item_name, **fuzzy})
+            else:
+                result.append({"name": item_name, **DEFAULT_SPEC})
 
     resolved_name = product["product_name"] if product else req.product_name
     matched_by = retrieval["matched_by"] if retrieval else "not_found"
