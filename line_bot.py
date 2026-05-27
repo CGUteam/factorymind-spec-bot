@@ -113,56 +113,23 @@ def _process_audio(user_id: str, message_id: str, token: str) -> None:
             _push(user_id, "（無法辨識，請再說一次）")
             return
 
-        # ASR_CONFIRM=true 時暫存辨識結果等使用者確認（測試用），預設直接繼續
-        if os.getenv("ASR_CONFIRM", "false").lower() == "true":
-            _pending_asr[user_id] = text
-            _push(user_id, f"🎤 辨識（faster-whisper）：\n{text}\n\n請回覆「確認」繼續，或「取消」放棄")
-            return
+        _push(user_id, f"🎤 {text}")
 
-        _push(user_id, f"🎤 辨識（faster-whisper）：\n{text}")
-
-        # Agent 解析指令
+        # Ollama → RAG → Robot（靜默執行）
         print("[Agent] parsing command...")
         task = agent.parse_command(text)
         print(f"[Agent] task: {task}")
-
-        # 先推 Agent 任務訊息
-        items = task.get("inspection_items", [])
-        task_str = (
-            f"📋 檢查任務（Ollama + Qwen2.5:7b）：\n"
-            f"產品：{task.get('product_name', '未知')}\n"
-            f"項目：{', '.join(i['name'] for i in items)}\n"
-            f"狀態：查詢 Spec 中..."
-        )
-        _push(user_id, task_str)
-
-        # 查 RAG 取得正確 Spec
         try:
             spec = agent.query_spec(task["product_name"], task["inspection_items"])
-            if not spec.get("product_found", True):
-                _push(user_id, f"⚠️ 找不到「{task.get('product_name')}」的產品規格，請確認產品名稱後重試")
-                return
             if spec.get("inspection_items"):
                 task["inspection_items"] = spec["inspection_items"]
-                spec_items = spec["inspection_items"]
-                spec_str = "\n".join(
-                    f"  • {i['name']}：門檻 {i.get('threshold', 0.8)}｜{i.get('standard', '')}"
-                    for i in spec_items
-                )
-                _push(user_id, f"🔍 Spec 查詢（RAG）：\n產品：{task.get('product_name')}\n{spec_str}")
-            print(f"[RAG] spec: {spec}")
         except Exception as e:
             print(f"[RAG] failed: {e}")
-            _push(user_id, "⚠️ Spec 查詢失敗，將使用預設門檻繼續")
-
-        # 派送給 Robot
         try:
             agent.dispatch_robot(task)
             print("[Robot] task dispatched")
         except Exception as e:
             print(f"[Robot] dispatch failed: {e}")
-            _push(user_id, f"⚠️ Robot 派送失敗：{e}")
-        print("[ASR] push sent")
     except Exception as e:
         print(f"[ASR] ERROR: {e}")
         try:

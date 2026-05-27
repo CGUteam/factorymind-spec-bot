@@ -1,4 +1,5 @@
 import os
+import queue
 import tempfile
 import threading
 from contextlib import asynccontextmanager
@@ -19,6 +20,49 @@ from app.rag_retriever import _ensure_product_embeddings
 
 load_dotenv()
 
+_esp32_queue: queue.Queue = queue.Queue()
+
+
+def _esp32_worker():
+    while True:
+        job = _esp32_queue.get()
+        try:
+            tmp_path = job["path"]
+            language = job["language"]
+            notify_user_id = os.getenv("LINE_NOTIFY_USER_ID")
+
+            asr_result = asr.transcribe(tmp_path, language=language)
+            text = asr_result.get("text", "")
+            if not text:
+                print("[ESP32] 無法辨識語音")
+                continue
+
+            if notify_user_id:
+                try:
+                    line_bot.push(notify_user_id, f"🎤 {text}")
+                except Exception as e:
+                    print(f"[LINE] push failed: {e}")
+
+            task = agent.parse_command(text)
+            try:
+                spec = agent.query_spec(task["product_name"], task["inspection_items"])
+                if spec.get("product_found") and spec.get("inspection_items"):
+                    task["inspection_items"] = spec["inspection_items"]
+            except Exception as e:
+                print(f"[RAG] failed: {e}")
+            try:
+                agent.dispatch_robot(task)
+            except Exception as e:
+                print(f"[Robot] dispatch failed: {e}")
+        except Exception as e:
+            print(f"[ESP32 Worker] error: {e}")
+        finally:
+            try:
+                os.unlink(job["path"])
+            except OSError:
+                pass
+            _esp32_queue.task_done()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -31,8 +75,8 @@ async def lifespan(app: FastAPI):
         channel_secret=os.getenv("LINE_CHANNEL_SECRET", ""),
         channel_access_token=os.getenv("LINE_CHANNEL_ACCESS_TOKEN", ""),
     )
-    # 背景預熱 bge-m3 product embeddings，避免第一次查詢才建
     threading.Thread(target=_ensure_product_embeddings, daemon=True).start()
+    threading.Thread(target=_esp32_worker, daemon=True).start()
     yield
 
 
@@ -121,49 +165,14 @@ async def process(
     file: UploadFile = File(...),
     language: str = Form(default=None),
 ):
-    """
-    ESP32 智慧音箱使用的整合端點。
-    傳入音訊 → ASR 辨識 → Agent 解析 → 回傳 JSON 並推 LINE 通知。
-    """
+    """ESP32 音箱端點：音訊排隊處理，ASR → LINE push → Ollama → RAG → Robot"""
     suffix = os.path.splitext(file.filename or "audio.wav")[1] or ".wav"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(await file.read())
         tmp_path = tmp.name
 
-    try:
-        asr_result = asr.transcribe(tmp_path, language=language)
-        text = asr_result.get("text", "")
-        if not text:
-            return JSONResponse({"text": "", "task": None, "error": "無法辨識語音"})
-        task = agent.parse_command(text)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        os.unlink(tmp_path)
-
-    # 推 LINE 通知給使用者
-    notify_user_id = os.getenv("LINE_NOTIFY_USER_ID")
-    if notify_user_id:
-        items = task.get("inspection_items", [])
-        item_names = ", ".join(i["name"] for i in items)
-        msg = (
-            f"📡 ESP32 語音指令\n"
-            f"🎤 辨識（faster-whisper）：{text}\n\n"
-            f"📋 檢查任務（Ollama + Qwen2.5:7b）：\n"
-            f"產品：{task.get('product_name', '未知')}\n"
-            f"項目：{item_names}\n"
-            f"狀態：{task.get('result', 'pending')}"
-        )
-        try:
-            line_bot.push(notify_user_id, msg)
-        except Exception as e:
-            print(f"[LINE] push failed: {e}")
-
-    return JSONResponse({
-        "text": text,
-        "language": asr_result.get("language"),
-        "task": task,
-    })
+    _esp32_queue.put({"path": tmp_path, "language": language})
+    return JSONResponse({"status": "queued", "queue_size": _esp32_queue.qsize()})
 
 
 @app.post("/inspection_result")

@@ -19,13 +19,32 @@ for bin in "$CONDA_UVICORN" "$NGROK"; do
 done
 
 # 停掉舊的服務
-echo "[1/3] 停止舊服務..."
+echo "[1/4] 停止舊服務..."
 pkill -f "uvicorn main:app" 2>/dev/null
 pkill -f "ngrok http" 2>/dev/null
 sleep 2
 
+# 啟動 Ollama（若尚未執行）
+echo "[2/4] 檢查 Ollama..."
+if curl -sf http://localhost:11434 > /dev/null 2>&1; then
+    echo "      Ollama 已在執行，略過"
+else
+    echo "      啟動 Ollama..."
+    ollama serve > /dev/null 2>&1 &
+    for i in $(seq 1 15); do
+        sleep 2
+        if curl -sf http://localhost:11434 > /dev/null 2>&1; then
+            echo "      Ollama 就緒"
+            break
+        fi
+        if [ $i -eq 15 ]; then
+            echo "[WARN] Ollama 啟動逾時，RAG 功能可能無法使用"
+        fi
+    done
+fi
+
 # 啟動 ASR 服務
-echo "[2/3] 啟動 ASR 服務（port $PORT）..."
+echo "[3/4] 啟動 ASR 服務（port $PORT）..."
 HF_HOME="$SCRIPT_DIR/models" \
     "$CONDA_UVICORN" main:app --host 0.0.0.0 --port $PORT &
 ASR_PID=$!
@@ -46,7 +65,7 @@ for i in $(seq 1 60); do
 done
 
 # 啟動 ngrok
-echo "[3/3] 啟動 ngrok 公開 URL..."
+echo "[4/4] 啟動 ngrok 公開 URL..."
 "$NGROK" http $PORT > /dev/null 2>&1 &
 sleep 4
 
