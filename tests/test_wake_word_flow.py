@@ -52,10 +52,23 @@ def _install_linebot_stubs() -> None:
     sys.modules.setdefault("linebot.v3.webhooks", linebot_webhooks)
 
 
+def _install_asr_stubs() -> None:
+    """讓測試可以在未安裝 faster-whisper 的環境匯入 asr.py。"""
+    faster_whisper = types.ModuleType("faster_whisper")
+
+    class WhisperModel:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+    faster_whisper.WhisperModel = WhisperModel
+    sys.modules.setdefault("faster_whisper", faster_whisper)
+
+
 def main() -> None:
     project_root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(project_root))
     _install_linebot_stubs()
+    _install_asr_stubs()
 
     import line_bot
 
