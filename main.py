@@ -23,35 +23,61 @@ load_dotenv()
 _esp32_queue: queue.Queue = queue.Queue()
 
 
+def _push(user_id: str | None, msg: str) -> None:
+    if not user_id:
+        return
+    try:
+        line_bot.push(user_id, msg)
+    except Exception as e:
+        print(f"[LINE] push failed: {e}")
+
+
 def _esp32_worker():
     while True:
         job = _esp32_queue.get()
         try:
             tmp_path = job["path"]
             language = job["language"]
-            notify_user_id = os.getenv("LINE_NOTIFY_USER_ID")
+            uid = os.getenv("LINE_NOTIFY_USER_ID")
 
+            # ── 步驟 1：ASR ──────────────────────────────────────────
             asr_result = asr.transcribe(tmp_path, language=language)
             text = asr_result.get("text", "")
             if not text:
                 print("[ESP32] 無法辨識語音")
                 continue
 
-            if notify_user_id:
-                try:
-                    line_bot.push(notify_user_id, f"🎤 {text}")
-                except Exception as e:
-                    print(f"[LINE] push failed: {e}")
+            _push(uid, f"📡 收到 ESP32 語音訊息\n─────────────────\n🎤 辨識（faster-whisper）：\n{text}")
 
+            # ── 步驟 2：Ollama parse ──────────────────────────────────
             task = agent.parse_command(text)
+            _push(uid, f"📋 收到檢查任務：{task.get('product_name', '未知')}")
+
+            # ── 步驟 3：RAG spec ─────────────────────────────────────
             try:
                 spec = agent.query_spec(task["product_name"], task["inspection_items"])
                 if spec.get("product_found") and spec.get("inspection_items"):
                     task["inspection_items"] = spec["inspection_items"]
+                    spec_lines = "\n".join(
+                        f"  • {i['name']}：門檻 {i.get('threshold', 0.8)}｜{i.get('standard', '')}"
+                        for i in spec["inspection_items"]
+                    )
+                    _push(
+                        uid,
+                        f"🔍 Spec 查詢（RAG）：\n"
+                        f"產品：{spec['product_name']}\n"
+                        f"{spec_lines}",
+                    )
+                else:
+                    _push(uid, f"🔍 Spec 查詢（RAG）：\n產品資料庫中找不到「{task['product_name']}」，使用預設門檻 0.80")
             except Exception as e:
                 print(f"[RAG] failed: {e}")
+
+            # ── 步驟 4：派送 Robot（結果由 /inspection_result 回傳）──
             try:
+                task["requester_id"] = uid
                 agent.dispatch_robot(task)
+                _push(uid, "⏳ 正在等待 Robot 檢測...")
             except Exception as e:
                 print(f"[Robot] dispatch failed: {e}")
         except Exception as e:
@@ -112,21 +138,12 @@ def query_spec(req: QuerySpecRequest) -> dict[str, Any]:
         product = retrieval["product"]
         inspection_specs = product.get("inspection_specs", {})
 
-    result = []
-    for item_name in req.inspection_items:
-        if item_name in inspection_specs:
-            spec = inspection_specs[item_name]
-            result.append({"name": item_name, **spec})
-        else:
-            # LLM 可能在項目名稱後加「檢查」等後綴，嘗試部分比對
-            fuzzy = next(
-                (spec for key, spec in inspection_specs.items() if key in item_name or item_name in key),
-                None,
-            )
-            if fuzzy:
-                result.append({"name": item_name, **fuzzy})
-            else:
-                result.append({"name": item_name, **DEFAULT_SPEC})
+    if inspection_specs:
+        # 找到產品，回傳資料庫裡的全部 spec，忽略 Ollama 解析的項目
+        result = [{"name": k, **v} for k, v in inspection_specs.items()]
+    else:
+        # 找不到產品，用 Ollama 解析的項目加上預設 spec
+        result = [{"name": item_name, **DEFAULT_SPEC} for item_name in req.inspection_items]
 
     product_found = product is not None
     resolved_name = product["product_name"] if product else req.product_name
@@ -179,33 +196,87 @@ async def process(
 async def inspection_result(request: Request):
     """Robot 執行完畢後回傳結果，推 LINE 報告"""
     data = await request.json()
-    product_name = data.get("product_name", "未知")
-    result       = data.get("result", "unknown")
-    items        = data.get("inspection_items", [])
 
-    result_icon = "✅" if result == "pass" else "❌"
-    placed_in   = data.get("placed_in") or ("正常區" if result == "pass" else "缺陷區")
-    items_str = "\n".join(
-        f"  {'✅' if i.get('pass') else '❌'} {i['name']}：{i.get('score', 0):.2f} "
-        f"（門檻 {i.get('threshold', 0.8):.2f}）"
-        for i in items
-    )
-    msg = (
-        f"📊 品管報告（SO-101 Robot）：\n"
-        f"產品：{product_name}\n"
-        f"結果：{result_icon} {'PASS' if result == 'pass' else 'FAIL'}\n"
-        f"放置：📦 {placed_in}\n\n"
-        f"檢查明細：\n{items_str}"
-    )
+    # ── 判斷是真實 Robot 格式（含「產品」欄位）還是 mock 格式 ──
+    if "產品" in data:
+        # 真實 Robot 格式
+        product_name = data.get("產品", "未知")
+        passed       = str(data.get("pass", "false")).lower() == "true"
+        result_icon  = "✅" if passed else "❌"
+        placed_in    = "正常區" if passed else "缺陷區"
 
-    notify_user_id = os.getenv("LINE_NOTIFY_USER_ID")
-    if notify_user_id:
+        # 查產品規格，取得每個項目的 min/max 做比對
+        parsed   = parse_product_command(product_name)
+        retrieval = retrieve_product(product_name, parsed)
+        specs    = retrieval["product"].get("inspection_specs", {}) if retrieval else {}
+
+        def _item_pass(key: str, value) -> bool:
+            if value is None:
+                return True
+            spec = specs.get(key, {})
+            mn, mx = spec.get("min"), spec.get("max")
+            if mn is not None and mx is not None:
+                return mn <= float(value) <= mx
+            return True
+
+        rows = [
+            ("產品邊長", data.get("產品邊長"), f"{data.get('產品邊長')} mm"),
+            ("頂部面積", data.get("頂部面積"), f"{data.get('頂部面積')} mm²"),
+            ("重量",     data.get("重量"),     f"{data.get('重量')} g"),
+            ("瑕疵面積", data.get("瑕疵面積"), f"{data.get('瑕疵面積')} mm²"),
+            ("瑕疵種類", data.get("瑕疵種類"), str(data.get("瑕疵種類"))),
+        ]
+
+        details = []
+        for key, value, display in rows:
+            if value is None:
+                continue
+            # 瑕疵種類：有值就是 fail
+            if key == "瑕疵種類":
+                ok = False
+            else:
+                ok = _item_pass(key, value)
+            icon = "✅" if ok else "❌"
+            details.append(f"  {icon} {key}：{display}")
+
+        details_str = "\n".join(details) if details else "  （無量測資料）"
+        msg = (
+            f"✅ 檢測完成，以下是檢測報告：\n"
+            f"產品：{product_name}\n"
+            f"結果：{result_icon} {'PASS' if passed else 'FAIL'}\n"
+            f"放置：📦 {placed_in}\n\n"
+            f"量測結果：\n{details_str}"
+        )
+        print(f"[Result] {product_name}: {'pass' if passed else 'fail'}")
+
+    else:
+        # Mock 格式
+        product_name = data.get("product_name", "未知")
+        result       = data.get("result", "unknown")
+        items        = data.get("inspection_items", [])
+        result_icon  = "✅" if result == "pass" else "❌"
+        placed_in    = data.get("placed_in") or ("正常區" if result == "pass" else "缺陷區")
+        items_str = "\n".join(
+            f"  {'✅' if i.get('pass') else '❌'} {i['name']}：{i.get('score', 0):.2f} "
+            f"（門檻 {i.get('threshold', 0.8):.2f}）"
+            for i in items
+        )
+        msg = (
+            f"✅ 檢測完成，以下是檢測報告：\n"
+            f"產品：{product_name}\n"
+            f"結果：{result_icon} {'PASS' if result == 'pass' else 'FAIL'}\n"
+            f"放置：📦 {placed_in}\n\n"
+            f"檢查明細：\n{items_str}"
+        )
+        print(f"[Result] {product_name}: {result}")
+
+    target_user_id = data.get("requester_id") or os.getenv("LINE_NOTIFY_USER_ID")
+    if target_user_id:
         try:
-            line_bot.push(notify_user_id, msg)
+            line_bot.push(target_user_id, msg)
         except Exception as e:
             print(f"[LINE] push failed: {e}")
 
-    print(f"[Result] {product_name}: {result}")
     return {"status": "ok"}
 
 

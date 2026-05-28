@@ -1,72 +1,17 @@
 [
   {
     "product_id": "P001",
-    "product_name": "藍色方塊",
-    "weight": 100,
-    "color": "藍色",
-    "shape": "方塊",
-    "size": {"length": 5, "width": 5, "height": 5, "unit": "cm"},
-    "inspection_specs": {
-      "外觀缺陷": {"threshold": 0.85, "method": "vision_detection", "standard": "無明顯刮痕、壓痕、異色"},
-      "尺寸":     {"threshold": 0.95, "method": "vision_detection", "standard": "邊長誤差 ±0.5mm 以內"},
-      "重量":     {"threshold": 0.90, "method": "manual",           "standard": "100g ±5g"},
-      "顏色":     {"threshold": 0.90, "method": "vision_detection", "standard": "色差 ΔE < 2.0"}
-    }
-  },
-  {
-    "product_id": "P002",
-    "product_name": "紅色圓球",
-    "weight": 80,
+    "product_name": "紅色方塊",
+    "weight": 16,
     "color": "紅色",
-    "shape": "圓球",
-    "size": {"diameter": 6, "unit": "cm"},
+    "shape": "方塊",
+    "size": {"length": 2.8, "width": 2.8, "height": 2.8, "unit": "cm"},
     "inspection_specs": {
-      "外觀缺陷": {"threshold": 0.85, "method": "vision_detection", "standard": "無明顯裂痕、凹陷"},
-      "尺寸":     {"threshold": 0.95, "method": "vision_detection", "standard": "直徑誤差 ±0.3mm 以內"},
-      "重量":     {"threshold": 0.90, "method": "manual",           "standard": "80g ±5g"},
-      "顏色":     {"threshold": 0.90, "method": "vision_detection", "standard": "色差 ΔE < 2.0"}
-    }
-  },
-  {
-    "product_id": "P003",
-    "product_name": "黃色三角形",
-    "weight": 60,
-    "color": "黃色",
-    "shape": "三角形",
-    "size": {"length": 7, "width": 7, "height": 1, "unit": "cm"},
-    "inspection_specs": {
-      "外觀缺陷": {"threshold": 0.85, "method": "vision_detection", "standard": "無明顯缺角、破損"},
-      "尺寸":     {"threshold": 0.95, "method": "vision_detection", "standard": "邊長誤差 ±0.5mm、厚度誤差 ±0.2mm 以內"},
-      "重量":     {"threshold": 0.90, "method": "manual",           "standard": "60g ±5g"},
-      "顏色":     {"threshold": 0.90, "method": "vision_detection", "standard": "色差 ΔE < 2.0"}
-    }
-  },
-  {
-    "product_id": "P004",
-    "product_name": "綠色圓柱",
-    "weight": 120,
-    "color": "綠色",
-    "shape": "圓柱",
-    "size": {"diameter": 4, "height": 10, "unit": "cm"},
-    "inspection_specs": {
-      "外觀缺陷": {"threshold": 0.85, "method": "vision_detection", "standard": "無明顯刮痕、變形"},
-      "尺寸":     {"threshold": 0.95, "method": "vision_detection", "standard": "直徑誤差 ±0.3mm、高度誤差 ±0.5mm 以內"},
-      "重量":     {"threshold": 0.90, "method": "manual",           "standard": "120g ±5g"},
-      "顏色":     {"threshold": 0.90, "method": "vision_detection", "standard": "色差 ΔE < 2.0"}
-    }
-  },
-  {
-    "product_id": "P005",
-    "product_name": "黑色長方體",
-    "weight": 150,
-    "color": "黑色",
-    "shape": "長方體",
-    "size": {"length": 10, "width": 4, "height": 3, "unit": "cm"},
-    "inspection_specs": {
-      "外觀缺陷": {"threshold": 0.85, "method": "vision_detection", "standard": "無明顯刮痕、壓痕"},
-      "尺寸":     {"threshold": 0.95, "method": "vision_detection", "standard": "各邊誤差 ±0.5mm 以內"},
-      "重量":     {"threshold": 0.90, "method": "manual",           "standard": "150g ±5g"},
-      "顏色":     {"threshold": 0.90, "method": "vision_detection", "standard": "色差 ΔE < 2.0"}
+      "產品邊長": {"threshold": 0.95, "method": "vision_detection", "standard": "28mm ±1mm",            "min": 27.0, "max": 29.0},
+      "頂部面積": {"threshold": 0.95, "method": "vision_detection", "standard": "784mm² ±50mm²",        "min": 734.0, "max": 834.0},
+      "重量":     {"threshold": 0.90, "method": "manual",           "standard": "16g ±1g",              "min": 15.0, "max": 17.0},
+      "瑕疵面積": {"threshold": 0.85, "method": "vision_detection", "standard": "< 7.84mm²（1% 以內）", "min": 0.0,  "max": 7.84},
+      "瑕疵種類": {"threshold": 0.85, "method": "vision_detection", "standard": "無黑點、無塊狀瑕疵"}
     }
   }
 ]
