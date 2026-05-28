@@ -1,4 +1,5 @@
 import os
+import re
 import tempfile
 import threading
 import httpx
@@ -15,6 +16,14 @@ import agent
 _handler = None
 _messaging_api = None
 _pending_asr: dict[str, str] = {}  # user_id → 待確認的辨識文字
+
+
+def _remove_wake_word(text: str) -> str:
+    """移除語音喚醒詞 Marvin，避免影響後續指令解析。"""
+    text = re.sub(r"(?<![A-Za-z])marvin(?![A-Za-z])", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"[\s,，.。!！?？:：;；、-]+", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
 
 
 def init(channel_secret: str, channel_access_token: str) -> None:
@@ -100,8 +109,11 @@ def _process_audio(user_id: str, message_id: str, token: str) -> None:
         print(f"[ASR] transcribing {audio_path}")
         result = asr.transcribe(audio_path)
         os.unlink(audio_path)
-        text = result["text"] or ""
-        print(f"[ASR] result: {text}")
+        raw_text = result["text"] or ""
+        text = _remove_wake_word(raw_text)
+        print(f"[ASR] result: {raw_text}")
+        if text != raw_text:
+            print(f"[ASR] cleaned: {text}")
 
         if not text:
             _push(user_id, "（無法辨識，請再說一次）")
