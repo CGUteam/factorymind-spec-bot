@@ -20,6 +20,7 @@ class InspectionTask(BaseModel):
     inspection_items: list[dict]
     placement: dict = {"pass": "正常區", "fail": "缺陷區"}
     result: str = "pending"
+    requester_id: str | None = None
 
 
 def simulate_inspection(task: InspectionTask):
@@ -53,6 +54,7 @@ def simulate_inspection(task: InspectionTask):
         "placement": task.placement,
         "placed_in": placement_zone,
         "result": final_result,
+        "requester_id": task.requester_id,
     }
 
     # 回傳結果給 Jetson

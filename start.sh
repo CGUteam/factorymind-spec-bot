@@ -19,13 +19,27 @@ for bin in "$CONDA_UVICORN" "$NGROK"; do
 done
 
 # 停掉舊的服務
-echo "[1/4] 停止舊服務..."
+echo "[1/5] 停止舊服務..."
 pkill -f "uvicorn main:app" 2>/dev/null
+pkill -f "uvicorn mock_rag:app" 2>/dev/null
+pkill -f "uvicorn mock_robot:app" 2>/dev/null
 pkill -f "ngrok http" 2>/dev/null
 sleep 2
 
+# 啟動 Mock 服務（RAG port 8001、Robot port 8002）
+echo "[2/5] 啟動 Mock 服務..."
+pkill -f "mock_rag:app" 2>/dev/null
+pkill -f "mock_robot:app" 2>/dev/null
+sleep 1
+MOCK_DIR="$SCRIPT_DIR/mock"
+"$CONDA_UVICORN" mock_rag:app --app-dir "$MOCK_DIR" --host 0.0.0.0 --port 8001 > /dev/null 2>&1 &
+"$CONDA_UVICORN" mock_robot:app --app-dir "$MOCK_DIR" --host 0.0.0.0 --port 8002 > /dev/null 2>&1 &
+sleep 2
+echo "      Mock RAG   → http://localhost:8001"
+echo "      Mock Robot → http://localhost:8002"
+
 # 啟動 Ollama（若尚未執行）
-echo "[2/4] 檢查 Ollama..."
+echo "[3/5] 檢查 Ollama..."
 if curl -sf http://localhost:11434 > /dev/null 2>&1; then
     echo "      Ollama 已在執行，略過"
 else
@@ -44,7 +58,7 @@ else
 fi
 
 # 啟動 ASR 服務
-echo "[3/4] 啟動 ASR 服務（port $PORT）..."
+echo "[4/5] 啟動 ASR 服務（port $PORT）..."
 HF_HOME="$SCRIPT_DIR/models" \
     "$CONDA_UVICORN" main:app --host 0.0.0.0 --port $PORT &
 ASR_PID=$!
@@ -65,7 +79,7 @@ for i in $(seq 1 60); do
 done
 
 # 啟動 ngrok
-echo "[4/4] 啟動 ngrok 公開 URL..."
+echo "[5/5] 啟動 ngrok 公開 URL..."
 "$NGROK" http $PORT > /dev/null 2>&1 &
 sleep 4
 
@@ -83,5 +97,5 @@ echo ""
 echo "按 Ctrl+C 停止所有服務"
 
 # 等待，Ctrl+C 時一起關閉
-trap "echo ''; echo '停止服務...'; pkill -f 'uvicorn main:app'; pkill -f 'ngrok http'; exit 0" INT
+trap "echo ''; echo '停止服務...'; pkill -f 'uvicorn main:app'; pkill -f 'uvicorn mock_rag:app'; pkill -f 'uvicorn mock_robot:app'; pkill -f 'ngrok http'; exit 0" INT
 wait $ASR_PID

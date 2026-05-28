@@ -69,15 +69,7 @@ def _process_text(user_id: str, text: str) -> None:
         task = agent.parse_command(text)
         print(f"[Agent] task: {task}")
 
-        # 先推 Agent 任務訊息
-        items = task.get("inspection_items", [])
-        task_str = (
-            f"📋 檢查任務（Ollama + Qwen2.5:7b）：\n"
-            f"產品：{task.get('product_name', '未知')}\n"
-            f"項目：{', '.join(i['name'] for i in items)}\n"
-            f"狀態：查詢 Spec 中..."
-        )
-        _push(user_id, task_str)
+        _push(user_id, f"📋 收到檢查任務：{task.get('product_name', '未知')}")
 
         # 查 RAG
         try:
@@ -99,7 +91,9 @@ def _process_text(user_id: str, text: str) -> None:
 
         # 派送給 Robot
         try:
+            task["requester_id"] = user_id
             agent.dispatch_robot(task)
+            _push(user_id, "⏳ 正在等待 Robot 檢測...")
         except Exception as e:
             print(f"[Robot] dispatch failed: {e}")
             _push(user_id, f"⚠️ Robot 派送失敗：{e}")
@@ -138,6 +132,7 @@ def _process_audio(user_id: str, message_id: str, token: str) -> None:
         except Exception as e:
             print(f"[RAG] failed: {e}")
         try:
+            task["requester_id"] = user_id
             agent.dispatch_robot(task)
             print("[Robot] task dispatched")
         except Exception as e:
