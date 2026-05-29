@@ -58,6 +58,16 @@ uvicorn factorymind-spec-bot:app --host 0.0.0.0 --port 8000
 8. If `pass = true`, execute the PASS placement policy.
 9. If `pass = false`, execute the FAIL placement policy.
 10. Return the final result JSON to the requester.
-```
-```
 
+### 📚 Development Resources
+LeRobot Development Notes
+
+Development logs, data collection process, training records, and deployment notes:
+
+https://hackmd.io/@Vn9d3hs_SMiDRldY6Mryww/Bk6OrSx1Mx
+
+Hugging Face Datasets & Policies
+
+Collected datasets and trained LeRobot policies:
+
+https://huggingface.co/yywang122
