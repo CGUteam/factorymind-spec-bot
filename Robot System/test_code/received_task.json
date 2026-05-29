@@ -1,0 +1,49 @@
+{
+  "product_name": "紅色方塊",
+  "inspection_items": [
+    {
+      "name": "產品邊長",
+      "threshold": 0.95,
+      "method": "vision_detection",
+      "standard": "28mm ±1mm",
+      "min": 27.0,
+      "max": 29.0
+    },
+    {
+      "name": "頂部面積",
+      "threshold": 0.95,
+      "method": "vision_detection",
+      "standard": "784mm² ±50mm²",
+      "min": 734.0,
+      "max": 834.0
+    },
+    {
+      "name": "重量",
+      "threshold": 0.9,
+      "method": "manual",
+      "standard": "16g ±1g",
+      "min": 15.0,
+      "max": 17.0
+    },
+    {
+      "name": "瑕疵面積",
+      "threshold": 0.85,
+      "method": "vision_detection",
+      "standard": "< 7.84mm²（1% 以內）",
+      "min": 0.0,
+      "max": 7.84
+    },
+    {
+      "name": "瑕疵種類",
+      "threshold": 0.85,
+      "method": "vision_detection",
+      "standard": "無黑點、無塊狀瑕疵"
+    }
+  ],
+  "placement": {
+    "pass": "正常區",
+    "fail": "缺陷區"
+  },
+  "result": "pending",
+  "requester_id": "U7709c0db8fb2a21b4d68809ab72cbcee"
+}
