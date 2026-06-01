@@ -10,11 +10,18 @@
 - [吳思聯](https://github.com/Poopogen)
 - [張舒茹](https://github.com/shuru921)
 - [謝易澄](https://github.com/dean900334)
+
   
+## System Architecture
+
+![Figure 10](Overview.JPG)
+
+
+
 ## Demo Video
 
 [![Watch the video](https://img.youtube.com/vi/BPspe2JTb98/maxresdefault.jpg)](https://www.youtube.com/watch?v=BPspe2JTb98)
----
+
 
 ## 🚀 系統特色
 
@@ -24,24 +31,6 @@
 - 👁️ AI 視覺檢測缺陷（pass / fail）
 - 📊 自動生成檢查報告
 
----
-
-## 🧩 系統架構
-
-```
-User (語音)
-   ↓
-ESP32 (麥克風)
-   ↓
-Jetson Orin
-   ├── OpenClaw Agent
-   ├── RAG Spec 檢索
-   └── 任務派送
-        ↓
-Robot System (SO-101 Arm + Camera + AI Model)
-        ↓
-檢查結果 → 報告輸出
-```
 
 ---
 
@@ -55,7 +44,7 @@ Robot System (SO-101 Arm + Camera + AI Model)
 
 ---
 
-### 2️⃣ Jetson Orin（核心）
+### 2️⃣ Jetson Orin
 
 負責：
 - 語音辨識（Whisper）
@@ -66,17 +55,7 @@ Robot System (SO-101 Arm + Camera + AI Model)
 
 ---
 
-### 3️⃣ OpenClaw Agent
-
-負責：
-- 解析使用者意圖
-- 查詢 Spec
-- 生成檢查任務
-- 整理檢查報告
-
----
-
-### 4️⃣ RAG Spec 檢索
+### 3️⃣ RAG Spec 檢索
 
 支援資料來源：
 - PDF / Excel / CSV / JSON
@@ -88,7 +67,7 @@ Robot System (SO-101 Arm + Camera + AI Model)
 
 ---
 
-### 5️⃣ Robot System（核心亮點）
+### 4️⃣ Robot System
 
 使用：
 
