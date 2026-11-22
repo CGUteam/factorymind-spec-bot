@@ -2,14 +2,14 @@
 
 本專案結合 **語音互動、RAG Spec 檢索、AI 視覺檢測與機器人品管**，打造一套智慧工廠品管系統。
 
-[專案簡介文件(5/12報告)](https://docs.google.com/presentation/d/1nNs3pxZ__qHQd3AwB9CL2SthH0tneZKk/edit?usp=sharing&ouid=113393456849610287890&rtpof=true&sd=true)
+[專案簡介文件](https://docs.google.com/presentation/d/1nNs3pxZ__qHQd3AwB9CL2SthH0tneZKk/edit?usp=sharing&ouid=113393456849610287890&rtpof=true&sd=true)
 
 
 開發人員: 
-- [1](https://github.com/yywang122)
-- [2](https://github.com/Poopogen)
-- [3](https://github.com/shuru921)
-- [4](https://github.com/dean900334)
+- [Person 1](https://github.com/yywang122)
+- [Person 2](https://github.com/Poopogen)
+- [Person 3](https://github.com/shuru921)
+- [Person 4](https://github.com/dean900334)
 
   
 ## System Architecture
